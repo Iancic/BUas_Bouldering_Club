@@ -17,6 +17,7 @@ st.set_page_config(
 # ——————————————————————————————————————————————————————————
 conn = sqlite3.connect('app.db', check_same_thread=False)
 cursor = conn.cursor()
+
 # Initialize tables if not exist
 cursor.execute(
     '''
@@ -25,7 +26,6 @@ cursor.execute(
         student_id TEXT NOT NULL,
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
-        phone TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
         draw_time INTEGER NOT NULL,
         UNIQUE(student_id, draw_time)
@@ -45,6 +45,13 @@ cursor.execute(
     '''
 )
 conn.commit()
+
+# Ensure 'phone' column exists in registrations table
+cursor.execute("PRAGMA table_info(registrations)")
+cols = [col_info[1] for col_info in cursor.fetchall()]
+if 'phone' not in cols:
+    cursor.execute("ALTER TABLE registrations ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+    conn.commit()
 
 # ——————————————————————————————————————————————————————————
 # Time utilities
