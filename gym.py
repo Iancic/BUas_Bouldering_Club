@@ -76,28 +76,16 @@ def perform_weekly_draw():
     cursor.execute('SELECT COUNT(*) FROM winners WHERE draw_time=?', (ts,))
     win_count = cursor.fetchone()[0]
     if now >= current_draw and reg_count > 0 and win_count == 0:
-<<<<<<< HEAD
         cursor.execute('SELECT student_id, first_name, last_name, phone FROM registrations WHERE draw_time=?', (ts,))
         rows = cursor.fetchall()
         winners = random.sample(rows, min(15, len(rows)))
         reserves = random.sample([r for r in rows if r not in winners], min(10, len(rows) - len(winners)))
         for sid, fn, ln, ph in winners:
-=======
-        cursor.execute('SELECT student_id, first_name, last_name FROM registrations WHERE draw_time=?', (ts,))
-        rows = cursor.fetchall()
-        winners = random.sample(rows, min(15, len(rows)))
-        reserves = random.sample([r for r in rows if r not in winners], min(10, len(rows) - len(winners)))
-        for sid, fn, ln in winners:
->>>>>>> origin/main
             cursor.execute(
                 'INSERT INTO winners(student_id, first_name, last_name, draw_time, category) VALUES (?, ?, ?, ?, ?)',
                 (sid, fn, ln, ts, 'winner')
             )
-<<<<<<< HEAD
         for sid, fn, ln, ph in reserves:
-=======
-        for sid, fn, ln in reserves:
->>>>>>> origin/main
             cursor.execute(
                 'INSERT INTO winners(student_id, first_name, last_name, draw_time, category) VALUES (?, ?, ?, ?, ?)',
                 (sid, fn, ln, ts, 'reserve')
