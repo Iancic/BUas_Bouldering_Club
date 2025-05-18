@@ -179,6 +179,22 @@ with st.form("registration_form"):
                 st.success("Registration successful!")
 
 # ——————————————————————————————————————————————————————————
+# UI: Registered Students List
+# ——————————————————————————————————————————————————————————
+ts_next = int(next_draw.timestamp())
+cursor.execute(
+    'SELECT student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
+    (ts_next,)
+)
+regs = cursor.fetchall()
+st.subheader(f"{len(regs)} Registered for Next Week")
+for sid, fn, ln, ph, ts in regs:
+    dt = datetime.datetime.fromtimestamp(ts, tz)
+    weekday = dt.strftime('%A')
+    st.write(f"{sid} – {fn} {ln} – {ph} – {weekday}, {dt.strftime('%d/%m/%Y %H:%M')}")
+
+'''
+# ——————————————————————————————————————————————————————————
 # UI: Populate Dummy Winners (Testing)
 # ——————————————————————————————————————————————————————————
 if st.button("Populate Dummy Winners"):
@@ -199,24 +215,11 @@ if st.button("Populate Dummy Winners"):
     st.success("Dummy winners populated.")
 
 # ——————————————————————————————————————————————————————————
-# UI: Registered Students List
-# ——————————————————————————————————————————————————————————
-ts_next = int(next_draw.timestamp())
-cursor.execute(
-    'SELECT student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
-    (ts_next,)
-)
-regs = cursor.fetchall()
-st.subheader(f"{len(regs)} Registered for Next Week")
-for sid, fn, ln, ph, ts in regs:
-    dt = datetime.datetime.fromtimestamp(ts, tz)
-    weekday = dt.strftime('%A')
-    st.write(f"{sid} – {fn} {ln} – {ph} – {weekday}, {dt.strftime('%d/%m/%Y %H:%M')}")
-
-# ——————————————————————————————————————————————————————————
 # UI: Clear Registrations
 # ——————————————————————————————————————————————————————————
+
 if st.button("Delete All Registrations for Next Week"):
     cursor.execute('DELETE FROM registrations WHERE draw_time=?', (ts_next,))
     conn.commit()
     st.success("All registrations for next week have been deleted.")
+'''
