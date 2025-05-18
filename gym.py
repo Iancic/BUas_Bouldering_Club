@@ -192,34 +192,3 @@ for sid, fn, ln, ph, ts in regs:
     dt = datetime.datetime.fromtimestamp(ts, tz)
     weekday = dt.strftime('%A')
     st.write(f"{sid} – {fn} {ln} – {ph} – {weekday}, {dt.strftime('%d/%m/%Y %H:%M')}")
-
-'''
-# ——————————————————————————————————————————————————————————
-# UI: Populate Dummy Winners (Testing)
-# ——————————————————————————————————————————————————————————
-if st.button("Populate Dummy Winners"):
-    cursor.execute('DELETE FROM winners WHERE draw_time=?', (ts_current,))
-    dummy_free = [("TEST01","Alice","Smith"),("TEST02","Bob","Brown"),("TEST03","Carol","Johnson")]
-    for sid_f, fn_f, ln_f in dummy_free:
-        cursor.execute(
-            'INSERT INTO winners(student_id, first_name, last_name, draw_time, category) VALUES (?,?,?,?,?)',
-            (sid_f, fn_f, ln_f, ts_current, 'winner')
-        )
-    dummy_reserve = [("TEST11","Dave","Lee"),("TEST12","Eve","White")]
-    for sid_r, fn_r, ln_r in dummy_reserve:
-        cursor.execute(
-            'INSERT INTO winners(student_id, first_name, last_name, draw_time, category) VALUES (?,?,?,?,?)',
-            (sid_r, fn_r, ln_r, ts_current, 'reserve')
-        )
-    conn.commit()
-    st.success("Dummy winners populated.")
-
-# ——————————————————————————————————————————————————————————
-# UI: Clear Registrations
-# ——————————————————————————————————————————————————————————
-
-if st.button("Delete All Registrations for Next Week"):
-    cursor.execute('DELETE FROM registrations WHERE draw_time=?', (ts_next,))
-    conn.commit()
-    st.success("All registrations for next week have been deleted.")
-'''
