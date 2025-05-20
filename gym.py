@@ -1,4 +1,4 @@
-# Full fixed code for app.py with Admin input in sidebar for visibility
+# Full fixed code for app.py with Admin input in sidebar and SQL error handling
 import streamlit as st
 import sqlite3
 import datetime
@@ -16,14 +16,15 @@ st.set_page_config(
 # ——————————————————————————————————————————————————————————
 # Admin Settings
 # ——————————————————————————————————————————————————————————
-# Define your admin keyword here (in production, use secure storage)
-ADMIN_KEYWORD = "letmein"  # Change to your secret phrase
+# Define your admin keyword here
+ADMIN_KEYWORD = "letmein"  # Change this to your secret phrase
 
 # ——————————————————————————————————————————————————————————
-# Database connection
+# Database connection (single connection)
 # ——————————————————————————————————————————————————————————
 conn = sqlite3.connect('app.db', check_same_thread=False)
 cursor = conn.cursor()
+
 # Initialize tables if not exist
 cursor.execute(
     '''
@@ -75,21 +76,27 @@ def perform_weekly_draw():
     current_draw, _ = compute_draw_times(now)
     ts = int(current_draw.timestamp())
     cursor.execute('SELECT COUNT(*) FROM registrations WHERE draw_time=?', (ts,))
-    if cursor.fetchone()[0] and now >= current_draw:
-        cursor.execute('SELECT COUNT(*) FROM winners WHERE draw_time=?', (ts,))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute('SELECT student_id, first_name, last_name, phone FROM registrations WHERE draw_time=?', (ts,))
-            rows = cursor.fetchall()
-            winners = random.sample(rows, min(15, len(rows)))
-            reserves = random.sample([r for r in rows if r not in winners], min(10, len(rows) - len(winners)))
-            for sid, fn, ln, ph in winners:
-                cursor.execute('INSERT INTO winners(student_id, first_name, last_name, draw_time, category) VALUES (?, ?, ?, ?, ?)',
-                               (sid, fn, ln, ts, 'winner'))
-            for sid, fn, ln, ph in reserves:
-                cursor.execute('INSERT INTO winners(student_id, first_name, last_name, draw_time, category) VALUES (?, ?, ?, ?, ?)',
-                               (sid, fn, ln, ts, 'reserve'))
-            cursor.execute('DELETE FROM registrations WHERE draw_time=?', (ts,))
-            conn.commit()
+    reg_count = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM winners WHERE draw_time=?', (ts,))
+    win_count = cursor.fetchone()[0]
+    if now >= current_draw and reg_count > 0 and win_count == 0:
+        cursor.execute('SELECT student_id, first_name, last_name, phone FROM registrations WHERE draw_time=?', (ts,))
+        rows = cursor.fetchall()
+        winners = random.sample(rows, min(15, len(rows)))
+        reserves = random.sample([r for r in rows if r not in winners], min(10, len(rows) - len(winners)))
+        for sid, fn, ln, ph in winners:
+            cursor.execute(
+                'INSERT INTO winners (student_id, first_name, last_name, draw_time, category) VALUES (?, ?, ?, ?, ?)',
+                (sid, fn, ln, ts, 'winner')
+            )
+        for sid, fn, ln, ph in reserves:
+            cursor.execute(
+                'INSERT INTO winners (student_id, first_name, last_name, draw_time, category) VALUES (?, ?, ?, ?, ?)',
+                (sid, fn, ln, ts, 'reserve')
+            )
+        cursor.execute('DELETE FROM registrations WHERE draw_time=?', (ts,))
+        conn.commit()
+
 perform_weekly_draw()
 
 # ——————————————————————————————————————————————————————————
@@ -97,12 +104,14 @@ perform_weekly_draw()
 # ——————————————————————————————————————————————————————————
 st.title("Climbing Gym – Weekly Management")
 
-# Sidebar: Admin Login for better visibility
-dashboard = st.sidebar
-admin_input = dashboard.text_input("Admin Keyword (leave blank for user view)", type="password")
+# Sidebar: Admin Login
+admin_input = st.sidebar.text_input(
+    "Admin Keyword (leave blank for user view)",
+    type="password"
+)
 is_admin = (admin_input.strip() == ADMIN_KEYWORD)
 if is_admin:
-    dashboard.success("Admin mode activated")
+    st.sidebar.success("Admin mode activated")
 
 # ——————————————————————————————————————————————————————————
 # UI: Current Week Winners
@@ -115,30 +124,39 @@ st.header("Current Week Winners")
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("Free Access (15 spots)")
-    cursor.execute('SELECT student_id, first_name, last_name FROM winners WHERE draw_time=? AND category="winner"',
-                   (ts_current,))
+    cursor.execute(
+        'SELECT student_id, first_name, last_name FROM winners WHERE draw_time=? AND category=?',
+        (ts_current, 'winner')
+    )
     for sid, fn, ln in cursor.fetchall():
         st.write(f"{sid} – {fn} {ln}")
 with col2:
     st.subheader("Reserve List (10 spots)")
-    cursor.execute('SELECT student_id, first_name, last_name FROM winners WHERE draw_time=? AND category="reserve"',
-                   (ts_current,))
+    cursor.execute(
+        'SELECT student_id, first_name, last_name FROM winners WHERE draw_time=? AND category=?',
+        (ts_current, 'reserve')
+    )
     for sid, fn, ln in cursor.fetchall():
         st.write(f"{sid} – {fn} {ln}")
+
 st.markdown("---")
 
 # ——————————————————————————————————————————————————————————
 # UI: Registration Section
 # ——————————————————————————————————————————————————————————
-start, end = next_draw.date(), (next_draw + datetime.timedelta(days=6)).date()
+start = next_draw.date()
+end = (next_draw + datetime.timedelta(days=6)).date()
 st.header(f"Registration for Week {start.strftime('%d.%m')} – {end.strftime('%d.%m')}")
 
 remaining = next_draw - now
-days, rem = remaining.days, remaining.seconds
-hours = rem // 3600
-minutes = (rem % 3600) // 60
+days = remaining.days
+hours = remaining.seconds // 3600
+minutes = (remaining.seconds % 3600) // 60
 st.subheader("Time Until Draw")
-st.markdown(f"<h2 style='background-color:#4CAF50; color:white; padding:10px; text-align:center; border-radius:5px;'>{days}d {hours}h {minutes}m</h2>", unsafe_allow_html=True)
+st.markdown(
+    f"<h2 style='background-color:#4CAF50; color:white; padding:10px; text-align:center; border-radius:5px;'>{days}d {hours}h {minutes}m</h2>",
+    unsafe_allow_html=True
+)
 
 # ——————————————————————————————————————————————————————————
 # UI: Registration Form
@@ -150,40 +168,56 @@ with st.form("registration_form"):
     phone = st.text_input("Phone Number")
     submitted = st.form_submit_button("Register")
     if submitted:
-        if not (sid.strip() and fname.strip() and lname.strip() and phone.strip()):
+        if not (sid and fname and lname and phone):
             st.error("All fields are required.")
         else:
             ts_next = int(next_draw.timestamp())
-            cursor.execute('SELECT COUNT(*) FROM registrations WHERE draw_time=? AND student_id=?', (ts_next, sid.strip()))
-            if cursor.fetchone()[0]:
+            cursor.execute(
+                'SELECT COUNT(*) FROM registrations WHERE draw_time=? AND student_id=?',
+                (ts_next, sid)
+            )
+            if cursor.fetchone()[0] > 0:
                 st.warning("This Student ID is already registered for next week.")
             else:
-                cursor.execute('INSERT INTO registrations(student_id, first_name, last_name, phone, timestamp, draw_time) VALUES (?, ?, ?, ?, ?, ?)',
-                               (sid.strip(), fname.strip(), lname.strip(), phone.strip(), int(now.timestamp()), ts_next))
-                conn.commit()
-                st.success("Registration successful!")
+                try:
+                    cursor.execute(
+                        'INSERT INTO registrations (student_id, first_name, last_name, phone, timestamp, draw_time) VALUES (?, ?, ?, ?, ?, ?)',
+                        (sid, fname, lname, phone, int(now.timestamp()), ts_next)
+                    )
+                    conn.commit()
+                    st.success("Registration successful!")
+                except sqlite3.IntegrityError as e:
+                    st.error(f"Registration failed: {e}")
 
 # ——————————————————————————————————————————————————————————
 # UI: Registered Students List
 # ——————————————————————————————————————————————————————————
 ts_next = int(next_draw.timestamp())
-cursor.execute('SELECT id, student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC', (ts_next,))
+cursor.execute(
+    'SELECT id, student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
+    (ts_next,)
+)
 regs = cursor.fetchall()
 st.subheader(f"{len(regs)} Registered for Next Week")
 
 # Admin: removal controls
 if is_admin and regs:
     st.markdown("**Admin Controls: Remove Registrations**")
-    to_remove = st.multiselect("Select registrations to remove:",
-                               options=[f"{r[0]}: {r[1]} – {r[2]} {r[3]}" for r in regs])
+    to_remove = st.multiselect(
+        "Select registrations to remove:",
+        options=[f"{r[0]}: {r[1]} – {r[2]} {r[3]}" for r in regs]
+    )
     if st.button("Remove Selected"):
         removed_ids = [int(item.split(":")[0]) for item in to_remove]
-        cursor.executemany('DELETE FROM registrations WHERE id=?', [(rid,) for rid in removed_ids])
+        cursor.executemany(
+            'DELETE FROM registrations WHERE id=?',
+            [(rid,) for rid in removed_ids]
+        )
         conn.commit()
         st.success(f"Removed {len(removed_ids)} registration(s).")
         st.experimental_rerun()
 
-# Display list
+# Display registrations
 for rid, sid, fn, ln, ph, ts in regs:
     dt = datetime.datetime.fromtimestamp(ts, tz)
     weekday = dt.strftime('%A')
