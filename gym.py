@@ -109,7 +109,7 @@ if is_admin:
 # ——————————————————————————————————————————————————————————
 now = now_dt()
 current_draw, next_draw = compute_draw_times(now)
- ts_current = int(current_draw.timestamp())
+ts_current = int(current_draw.timestamp())
 
 st.header("Current Week Winners")
 col1, col2 = st.columns(2)
