@@ -194,7 +194,7 @@ with st.form("registration_form"):
 # ——————————————————————————————————————————————————————————
 # UI: Registered Students List
 # ——————————————————————————————————————————————————————————
- ts_next = int(next_draw.timestamp())
+ts_next = int(next_draw.timestamp())
 cursor.execute(
     'SELECT id, student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
     (ts_next,)
