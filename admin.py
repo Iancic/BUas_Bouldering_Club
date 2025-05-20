@@ -1,6 +1,8 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import os
+from pathlib import Path
 
 # ——————————————————————————————————————————————————————————
 # Admin interface for app.db
@@ -12,14 +14,23 @@ st.set_page_config(
 
 st.title("Database Administration")
 
+# Determine path to app.db relative to this script
+BASE_DIR = Path(__file__).parent
+DB_PATH = BASE_DIR / 'app.db'
+
 # Connect to SQLite database
-conn = sqlite3.connect('app.db', check_same_thread=False)
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 
 # Function to load and filter table into DataFrame
 def load_and_filter_table(name, search_term):
     df = pd.read_sql(f"SELECT * FROM {name}", conn)
     if search_term:
-        mask = df.apply(lambda row: row.astype(str).str.contains(search_term, case=False, na=False).any(), axis=1)
+        mask = df.apply(
+            lambda row: row.astype(str)
+                          .str.contains(search_term, case=False, na=False)
+                          .any(),
+            axis=1
+        )
         df = df[mask]
     return df
 
@@ -45,7 +56,7 @@ st.markdown("---")
 st.header("Winners")
 search_wins = st.text_input("Search Winners", key="search_wins")
 df_wins = load_and_filter_table('winners', search_wins)
-edited_wins = st.experimental_data_editor(
+edited_wins = st.data_editor(
     df_wins,
     num_rows="dynamic",
     key="wins_editor",
