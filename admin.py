@@ -27,7 +27,7 @@ def load_and_filter_table(name, search_term):
 st.header("Registrations")
 search_regs = st.text_input("Search Registrations", key="search_regs")
 df_regs = load_and_filter_table('registrations', search_regs)
-edited_regs = st.experimental_data_editor(
+edited_regs = st.st.data_editor(
     df_regs,
     num_rows="dynamic",
     key="regs_editor",
