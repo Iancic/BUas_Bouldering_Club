@@ -13,6 +13,12 @@ st.set_page_config(
 )
 
 # ——————————————————————————————————————————————————————————
+# Admin Settings
+# ——————————————————————————————————————————————————————————
+# Define your admin keyword here (in production, use secure storage)
+ADMIN_KEYWORD = "letmein"  # Change this to your desired admin password/keyword
+
+# ——————————————————————————————————————————————————————————
 # Database connection (single connection)
 # ——————————————————————————————————————————————————————————
 conn = sqlite3.connect('app.db', check_same_thread=False)
@@ -26,6 +32,7 @@ cursor.execute(
         student_id TEXT NOT NULL,
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
+        phone TEXT NOT NULL DEFAULT '',
         timestamp INTEGER NOT NULL,
         draw_time INTEGER NOT NULL,
         UNIQUE(student_id, draw_time)
@@ -45,13 +52,6 @@ cursor.execute(
     '''
 )
 conn.commit()
-
-# Ensure 'phone' column exists in registrations table
-cursor.execute("PRAGMA table_info(registrations)")
-cols = [col_info[1] for col_info in cursor.fetchall()]
-if 'phone' not in cols:
-    cursor.execute("ALTER TABLE registrations ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
-    conn.commit()
 
 # ——————————————————————————————————————————————————————————
 # Time utilities
@@ -103,6 +103,14 @@ perform_weekly_draw()
 # UI: Header
 # ——————————————————————————————————————————————————————————
 st.title("Climbing Gym – Weekly Management")
+
+# ——————————————————————————————————————————————————————————
+# UI: Admin Login
+# ——————————————————————————————————————————————————————————
+admin_input = st.text_input("Admin Keyword (leave blank for user view)", type="password")
+is_admin = (admin_input.strip() == ADMIN_KEYWORD)
+if is_admin:
+    st.success("Admin mode activated")
 
 # ——————————————————————————————————————————————————————————
 # UI: Current Week Winners
@@ -159,7 +167,6 @@ with st.form("registration_form"):
     phone = st.text_input("Phone Number")
     submitted = st.form_submit_button("Register")
     if submitted:
-        # Validate all fields
         if not sid.strip() or not fname.strip() or not lname.strip() or not phone.strip():
             st.error("All fields are required. Please fill in Student ID, First Name, Last Name, and Phone Number.")
         else:
@@ -183,12 +190,31 @@ with st.form("registration_form"):
 # ——————————————————————————————————————————————————————————
 ts_next = int(next_draw.timestamp())
 cursor.execute(
-    'SELECT student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
+    'SELECT id, student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
     (ts_next,)
 )
 regs = cursor.fetchall()
 st.subheader(f"{len(regs)} Registered for Next Week")
-for sid, fn, ln, ph, ts in regs:
+
+# If admin, allow deletion
+if is_admin and regs:
+    st.markdown("**Admin Controls: Remove Registrations**")
+    to_remove = st.multiselect(
+        "Select registrations to remove:",
+        options=[f"{r[0]}: {r[1]} – {r[2]} {r[3]}" for r in regs]
+    )
+    if st.button("Remove Selected"):
+        removed_ids = [int(item.split(":")[0]) for item in to_remove]
+        cursor.executemany(
+            'DELETE FROM registrations WHERE id=?',
+            [(rid,) for rid in removed_ids]
+        )
+        conn.commit()
+        st.success(f"Removed {len(removed_ids)} registration(s).")
+        st.experimental_rerun()
+
+# Display list
+for rid, sid, fn, ln, ph, ts in regs:
     dt = datetime.datetime.fromtimestamp(ts, tz)
     weekday = dt.strftime('%A')
     st.write(f"{sid} – {fn} {ln} – {ph} – {weekday}, {dt.strftime('%d/%m/%Y %H:%M')}")
