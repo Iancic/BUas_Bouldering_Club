@@ -1,4 +1,4 @@
-# Full fixed code for app.py with Admin input in sidebar and SQL error handling
+# Full fixed code for app.py with Admin input sidebar and phone-column check
 import streamlit as st
 import sqlite3
 import datetime
@@ -16,8 +16,7 @@ st.set_page_config(
 # ——————————————————————————————————————————————————————————
 # Admin Settings
 # ——————————————————————————————————————————————————————————
-# Define your admin keyword here
-ADMIN_KEYWORD = "letmein"  # Change this to your secret phrase
+ADMIN_KEYWORD = "letmein"  # Change to your secret phrase
 
 # ——————————————————————————————————————————————————————————
 # Database connection (single connection)
@@ -33,7 +32,6 @@ cursor.execute(
         student_id TEXT NOT NULL,
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
-        phone TEXT NOT NULL DEFAULT '',
         timestamp INTEGER NOT NULL,
         draw_time INTEGER NOT NULL,
         UNIQUE(student_id, draw_time)
@@ -53,6 +51,13 @@ cursor.execute(
     '''
 )
 conn.commit()
+
+# Ensure 'phone' column exists in registrations (for legacy DBs)
+cursor.execute("PRAGMA table_info(registrations)")
+cols = [col[1] for col in cursor.fetchall()]
+if 'phone' not in cols:
+    cursor.execute("ALTER TABLE registrations ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+    conn.commit()
 
 # ——————————————————————————————————————————————————————————
 # Time utilities
@@ -103,8 +108,6 @@ perform_weekly_draw()
 # UI: Header + Sidebar Admin Login
 # ——————————————————————————————————————————————————————————
 st.title("Climbing Gym – Weekly Management")
-
-# Sidebar: Admin Login
 admin_input = st.sidebar.text_input(
     "Admin Keyword (leave blank for user view)",
     type="password"
@@ -144,14 +147,13 @@ st.markdown("---")
 # ——————————————————————————————————————————————————————————
 # UI: Registration Section
 # ——————————————————————————————————————————————————————————
-start = next_draw.date()
-end = (next_draw + datetime.timedelta(days=6)).date()
+start, end = next_draw.date(), (next_draw + datetime.timedelta(days=6)).date()
 st.header(f"Registration for Week {start.strftime('%d.%m')} – {end.strftime('%d.%m')}")
 
 remaining = next_draw - now
-days = remaining.days
-hours = remaining.seconds // 3600
-minutes = (remaining.seconds % 3600) // 60
+days, rem = remaining.days, remaining.seconds
+hours = rem // 3600
+minutes = (rem % 3600) // 60
 st.subheader("Time Until Draw")
 st.markdown(
     f"<h2 style='background-color:#4CAF50; color:white; padding:10px; text-align:center; border-radius:5px;'>{days}d {hours}h {minutes}m</h2>",
@@ -192,7 +194,7 @@ with st.form("registration_form"):
 # ——————————————————————————————————————————————————————————
 # UI: Registered Students List
 # ——————————————————————————————————————————————————————————
-ts_next = int(next_draw.timestamp())
+ ts_next = int(next_draw.timestamp())
 cursor.execute(
     'SELECT id, student_id, first_name, last_name, phone, timestamp FROM registrations WHERE draw_time=? ORDER BY timestamp DESC',
     (ts_next,)
